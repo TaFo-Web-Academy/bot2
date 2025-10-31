@@ -8,6 +8,7 @@ import time
 from datetime import datetime
 from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ConversationHandler, ContextTypes
+from telegram.error import Conflict
 from flask import Flask
 from threading import Thread
 
@@ -105,41 +106,16 @@ questions = [
         'text': '5. <b>Оё касе зиндагии туро идора мекунад?</b>',
         'options': ['А) Ҳа, пай бурдаам', 'Б) Шояд, меҷӯям', 'В) Не, ҳамаашро ман медонам', 'Г) Намефаҳмам'],
         'scores': [3, 2, 1, 0]
-    },
-    {
-        'text': '6. <b>Ту ҳис мекунӣ, ки зиндагиат аз они туст?</b>',
-        'options': ['А) Ҳа, ман соҳиби зиндагиям', 'Б) Баъзан чунин ҳис мекунам', 'В) Не, фикр мекунам барои дигарон зиндагӣ мекунам', 'Г) Ман намедонам'],
-        'scores': [3, 1, 0, 2]
-    },
-    {
-        'text': '7. <b>Овози дили ту чӣ мегӯяд?</b>',
-        'options': ['А) Метавонӣ!', 'Б) Эҳтимол набарояд…', 'В) То ҳол сабр кун', 'Г) Хомӯш аст'],
-        'scores': [3, 1, 2, 0]
-    },
-    {
-        'text': '8. <b>Зершуур чӣ кор карда метавонад?</b>',
-        'options': ['А) Маро озод мекунад', 'Б) Ёрӣ медиҳад, ки бахшам', 'В) Ман намефаҳмам', 'Г) Ман ба ин чизҳо бовар надорам'],
-        'scores': [3, 2, 1, 0]
-    },
-    {
-        'text': '9. <b>Агар як варақи хол дошта бошӣ, чӣ менависӣ?</b>',
-        'options': ['А) Орзую муҳаббат', 'Б) Намедонам', 'В) "Ҳарчи шавад шавад"'],
-        'scores': [3, 1, 0]
-    },
-    {
-        'text': '10. <b>Омодаӣ зиндагиро худад нависӣ?</b>',
-        'options': ['А) Ҳа, албатта', 'Б) Мехоҳам, вале метарсам', 'В) Ҳоло намефаҳмам', 'Г) Не, ҳамин ҳаётро қабул кардам'],
-        'scores': [3, 2, 1, 0]
     }
 ]
 
 def get_result(total_score):
-    if total_score >= 25:
-        return "Ман тақдири худамам", "🎉 <b>Табрик мекунам! Ту аз он касоне, ки зиндагиашро худ месозад!</b>\n\n✨ Ту ба назари худ омадаастӣ, ки қудрат дар дасти туст. Дигар ту ба тақдир шикоят намекунед, балки онро бо қарорҳои худ месозед.\n\n💫 <b>Тренинг барои ту як мусоидат хоҳад буд, то боз ҳам зудтар пеш равед!</b>"
-    elif total_score >= 15:
-        return "Ман бедор шуда истодаам", "🌅 <b>Огоҳӣ! Ту дар оғози роҳе, ки ба сӯи озодӣ меравад.</b>\n\nТу ҳис мекунӣ, ки чизе дар зиндагиат нодуруст аст, вале ҳанӯз роҳи дурустро наёфтаӣ. Ин аломати оғози тағйироти бузург аст!\n\n🚀 <b>Тренинг ба ту кӯмак мекунад, ки ин роҳро бо суръат ва умудвори зиёд тай кунеӣ.</b>"
+    if total_score >= 12:
+        return "Ман тақдири худамам", "🎉 <b>Табрик мекунам! Ту аз он касоне, ки зиндагиашро худ месозад!</b>"
+    elif total_score >= 7:
+        return "Ман бедор шуда истодаам", "🌅 <b>Огоҳӣ! Ту дар оғози роҳе, ки ба сӯи озодӣ меравад.</b>"
     else:
-        return "Ман хомӯш шудам", "🌱 <b>Вақти бедор шудан расидааст!</b>\n\nНаметарсӣ? Ин хеле табиӣ аст. Ҳама мо аз ҷое оғоз мекунем. Аз ин сатр то он ҷое, ки мехоҳӣ, як қадам боқӣ мондааст.\n\n❤️ <b>Тренинг ба ту нишон медиҳад, ки чӣ тавр ин қадамҳоро бо эътимод ва шукуфтан бигирӣ.</b>"
+        return "Ман хомӯш шудам", "🌱 <b>Вақти бедор шудан расидааст!</b>"
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     try:
@@ -159,7 +135,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 
         await update.message.reply_text(
             "🎭 <b>ТЕСТ: ОЁ ТУ ЗИНДАГИИ ХУДРО ХУДАД МЕНАВИСӢ Ё НЕ?</b>\n\n"
-            "📊 10 савол | ⏱ 5 дақиқа\n\n"
+            "📊 5 савол | ⏱ 3 дақиқа\n\n"
             "Барои оғоз тугмаро пахш кунед...",
             parse_mode='HTML'
         )
@@ -206,25 +182,10 @@ async def ask_question(update_or_query, context: ContextTypes.DEFAULT_TYPE):
             
             result_message = (
                 f"🎯 <b>НАТИҶАИ ТЕСТИ ШУМО</b>\n\n"
-                f"⭐ <b>Балли шумо:</b> {total_score}/30\n"
+                f"⭐ <b>Балли шумо:</b> {total_score}/15\n"
                 f"🌟 <b>Статус:</b> {result_title}\n\n"
                 f"{result_description}\n\n"
-                f"━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-                f"🎪 <b>ТАРЧИМАИ ТРЕНИНГ</b>\n\n"
-                f"📅 <b>Сана:</b> 8 ноябр 2024\n"
-                f"🕐 <b>Соат:</b> 14:00 - 17:00\n"
-                f"📍 <b>Ҷой:</b> Душанбе, Профсаюз\n"
-                f"       Доми София, 3 этаж\n"
-                f"👥 <b>Ҷойҳо маҳдуд:</b> 40 нафар\n\n"
-                f"💎 <b>Дар ин тренинг меомӯзед:</b>\n"
-                f"• Барномаҳои зершуури худро шиносед\n"
-                f"• Тақдири навро бо дасти худ нависед\n"
-                f"• Ба садои дарунии худ гӯш диҳед\n"
-                f"• Орзуҳои кӯдакиро зинда кунед\n\n"
-                f"🔗 <b>Барои сабти ном:</b>\n"
-                f"{REGISTRATION_LINK}\n\n"
-                f"✨ <b>Мо дар интизори дидори шумоем!</b>\n"
-                f"━━━━━━━━━━━━━━━━━━━━━━━━━"
+                f"🔗 <b>Барои сабти ном:</b>\n{REGISTRATION_LINK}"
             )
 
             await message_method(result_message, parse_mode='HTML')
@@ -322,6 +283,21 @@ def run_flask():
     port = int(os.environ.get('PORT', 5000))
     app.run(host='0.0.0.0', port=port, debug=False)
 
+async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Обработчик ошибок"""
+    logger.error(f"Exception while handling an update: {context.error}")
+    
+    if isinstance(context.error, Conflict):
+        logger.warning("Обнаружен конфликт - другой экземпляр бота запущен. Завершаем работу...")
+        # Даем время другому экземпляру завершиться
+        await asyncio.sleep(10)
+        # Пытаемся перезапуститься
+        await context.application.stop()
+        await asyncio.sleep(5)
+        await context.application.start()
+        await context.application.updater.start_polling()
+        logger.info("Бот перезапущен после конфликта")
+
 def main():
     # Запускаем Flask сервер
     flask_thread = Thread(target=run_flask)
@@ -333,23 +309,37 @@ def main():
     monitoring_thread.daemon = True
     monitoring_thread.start()
 
-    # Запускаем бота
+    # Запускаем бота с обработкой ошибок
     try:
         application = Application.builder().token(BOT_TOKEN).build()
+
+        # Добавляем обработчик ошибок
+        application.add_error_handler(error_handler)
 
         conv_handler = ConversationHandler(
             entry_points=[CommandHandler("start", start)],
             states={
                 QUESTIONS: [CallbackQueryHandler(handle_answer, pattern='^ans_')],
             },
-            fallbacks=[]
+            fallbacks=[],
+            per_message=False  # Явно указываем этот параметр
         )
 
         application.add_handler(conv_handler)
         application.add_handler(CommandHandler("stats", admin_stats))
 
         logger.info("🤖 Бот оғоз ёфт...")
-        application.run_polling()
+        
+        # Запускаем бота с обработкой конфликтов
+        application.run_polling(
+            close_loop=False,
+            stop_signals=None
+        )
+        
+    except Conflict as e:
+        logger.warning(f"Конфликт при запуске: {e}. Ждем 30 секунд и перезапускаем...")
+        time.sleep(30)
+        main()  # Рекурсивный перезапуск
     except Exception as e:
         logger.error(f"Критическая ошибка бота: {e}")
         # Перезапуск через 60 секунд
