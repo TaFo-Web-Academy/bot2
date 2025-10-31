@@ -1,14 +1,10 @@
 import logging
 import sqlite3
-import csv
-import os
-import asyncio
 import requests
 import time
 from datetime import datetime
 from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ConversationHandler, ContextTypes
-from telegram.error import Conflict
 from flask import Flask
 from threading import Thread
 
@@ -16,7 +12,6 @@ from threading import Thread
 BOT_TOKEN = "8232853921:AAGx1Mo8EwJGX46t_3h2IIQBkI7A445Femk"
 ADMIN_IDS = [7249758488]
 REGISTRATION_LINK = "https://tafo-web-academy.github.io/Jannat-Registration/"
-HEALTHCHECKS_URL = "https://hc-ping.com/08edb4bf-bdd9-4286-811c-64eee76d98c7"
 
 # ========== DATABASE ==========
 class Database:
@@ -56,11 +51,6 @@ class Database:
         except sqlite3.IntegrityError:
             return False
 
-    def get_all_users(self):
-        cursor = self.conn.cursor()
-        cursor.execute('SELECT user_id, username, test_result, total_score, registration_date FROM users ORDER BY registration_date DESC')
-        return cursor.fetchall()
-
     def get_users_count(self):
         cursor = self.conn.cursor()
         cursor.execute('SELECT COUNT(*) FROM users')
@@ -68,15 +58,7 @@ class Database:
 
 # ========== BOT LOGIC ==========
 db = Database()
-
-# Настройка логирования
-logging.basicConfig(
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    level=logging.INFO,
-    handlers=[
-        logging.StreamHandler()
-    ]
-)
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 QUESTIONS = 0
@@ -96,137 +78,104 @@ questions = [
         'text': '3. <b>Орзуи кӯдакиатро ёд дори?</b>',
         'options': ['А) Ҳа, ёдам ҳаст', 'Б) Не, фаромӯш кардам', 'В) Ман дигар орзу надорам'],
         'scores': [3, 1, 0]
-    },
-    {
-        'text': '4. <b>"Зершуур" чӣ маъно дорад?</b>',
-        'options': ['А) Қувваи дохилӣ', 'Б) Барои равоншиносон', 'В) Ман намефаҳмам, ле ҷолиб аст', 'Г) Ман бовар надорам'],
-        'scores': [3, 1, 2, 0]
-    },
-    {
-        'text': '5. <b>Оё касе зиндагии туро идора мекунад?</b>',
-        'options': ['А) Ҳа, пай бурдаам', 'Б) Шояд, меҷӯям', 'В) Не, ҳамаашро ман медонам', 'Г) Намефаҳмам'],
-        'scores': [3, 2, 1, 0]
     }
 ]
 
 def get_result(total_score):
-    if total_score >= 12:
+    if total_score >= 7:
         return "Ман тақдири худамам", "🎉 <b>Табрик мекунам! Ту аз он касоне, ки зиндагиашро худ месозад!</b>"
-    elif total_score >= 7:
+    elif total_score >= 4:
         return "Ман бедор шуда истодаам", "🌅 <b>Огоҳӣ! Ту дар оғози роҳе, ки ба сӯи озодӣ меравад.</b>"
     else:
         return "Ман хомӯш шудам", "🌱 <b>Вақти бедор шудан расидааст!</b>"
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    try:
-        user_id = update.effective_user.id
-        
-        if db.user_exists(user_id):
-            await update.message.reply_text(
-                "✨ Шумо аллакай ин тестро гузаронидаед! ✅\n\n"
-                f"Барои сабти ном:\n{REGISTRATION_LINK}",
-                parse_mode='HTML'
-            )
-            return ConversationHandler.END
-
-        context.user_data.clear()
-        context.user_data['current_question'] = 0
-        context.user_data['score'] = 0
-
+    user_id = update.effective_user.id
+    
+    if db.user_exists(user_id):
         await update.message.reply_text(
-            "🎭 <b>ТЕСТ: ОЁ ТУ ЗИНДАГИИ ХУДРО ХУДАД МЕНАВИСӢ Ё НЕ?</b>\n\n"
-            "📊 5 савол | ⏱ 3 дақиқа\n\n"
-            "Барои оғоз тугмаро пахш кунед...",
+            "✨ Шумо аллакай ин тестро гузаронидаед! ✅\n\n"
+            f"Барои сабти ном:\n{REGISTRATION_LINK}",
             parse_mode='HTML'
         )
-
-        await ask_question(update, context)
-        return QUESTIONS
-    except Exception as e:
-        logger.error(f"Ошибка в команде /start: {e}")
-        await update.message.reply_text("❌ Хато дар система. Лутфан баъдтар кӯшиш кунед.")
         return ConversationHandler.END
 
+    context.user_data.clear()
+    context.user_data['current_question'] = 0
+    context.user_data['score'] = 0
+
+    await update.message.reply_text(
+        "🎭 <b>ТЕСТ: ОЁ ТУ ЗИНДАГИИ ХУДРО ХУДАД МЕНАВИСӢ Ё НЕ?</b>\n\n"
+        "Барои оғоз тугмаро пахш кунед...",
+        parse_mode='HTML'
+    )
+
+    await ask_question(update, context)
+    return QUESTIONS
+
 async def ask_question(update_or_query, context: ContextTypes.DEFAULT_TYPE):
-    try:
-        if isinstance(update_or_query, Update):
-            message_method = update_or_query.message.reply_text
-        else:
-            message_method = update_or_query.message.edit_text
+    if isinstance(update_or_query, Update):
+        message_method = update_or_query.message.reply_text
+    else:
+        message_method = update_or_query.message.edit_text
 
-        current_question = context.user_data.get('current_question', 0)
+    current_question = context.user_data.get('current_question', 0)
 
-        if current_question < len(questions):
-            question = questions[current_question]
-            
-            # Прогресс бар
-            progress = "🟢" * (current_question + 1) + "⚪" * (len(questions) - current_question - 1)
-            
-            question_text = (
-                f"📝 <b>Савол {current_question + 1}/{len(questions)}</b>\n"
-                f"{progress}\n\n"
-                f"{question['text']}\n\n"
-                f"<b>Интихоби худро кунед:</b>"
-            )
+    if current_question < len(questions):
+        question = questions[current_question]
+        
+        question_text = (
+            f"📝 <b>Савол {current_question + 1}/{len(questions)}</b>\n\n"
+            f"{question['text']}\n\n"
+            f"<b>Интихоби худро кунед:</b>"
+        )
 
-            buttons = []
-            for index, option in enumerate(question['options']):
-                button = InlineKeyboardButton(f"{option}", callback_data=f"ans_{current_question}_{index}")
-                buttons.append([button])
+        buttons = []
+        for index, option in enumerate(question['options']):
+            button = InlineKeyboardButton(f"{option}", callback_data=f"ans_{current_question}_{index}")
+            buttons.append([button])
 
-            reply_markup = InlineKeyboardMarkup(buttons)
-            await message_method(question_text, reply_markup=reply_markup, parse_mode='HTML')
-        else:
-            total_score = context.user_data.get('score', 0)
-            result_title, result_description = get_result(total_score)
-            
-            result_message = (
-                f"🎯 <b>НАТИҶАИ ТЕСТИ ШУМО</b>\n\n"
-                f"⭐ <b>Балли шумо:</b> {total_score}/15\n"
-                f"🌟 <b>Статус:</b> {result_title}\n\n"
-                f"{result_description}\n\n"
-                f"🔗 <b>Барои сабти ном:</b>\n{REGISTRATION_LINK}"
-            )
+        reply_markup = InlineKeyboardMarkup(buttons)
+        await message_method(question_text, reply_markup=reply_markup, parse_mode='HTML')
+    else:
+        total_score = context.user_data.get('score', 0)
+        result_title, result_description = get_result(total_score)
+        
+        result_message = (
+            f"🎯 <b>НАТИҶАИ ТЕСТИ ШУМО</b>\n\n"
+            f"⭐ <b>Балли шумо:</b> {total_score}/9\n"
+            f"🌟 <b>Статус:</b> {result_title}\n\n"
+            f"{result_description}\n\n"
+            f"🔗 <b>Барои сабти ном:</b>\n{REGISTRATION_LINK}"
+        )
 
-            await message_method(result_message, parse_mode='HTML')
+        await message_method(result_message, parse_mode='HTML')
 
-            user_id = update_or_query.from_user.id
-            username = update_or_query.from_user.username or "Номаълум"
-            db.add_user(user_id, username, result_title, total_score)
-            return ConversationHandler.END
-    except Exception as e:
-        logger.error(f"Ошибка в ask_question: {e}")
-        if isinstance(update_or_query, Update):
-            await update_or_query.message.reply_text("❌ Хато дар система. Лутфан /start-ро аз нав пахш кунед.")
-        else:
-            await update_or_query.message.reply_text("❌ Хато дар система. Лутфан /start-ро аз нав пахш кунед.")
+        user_id = update_or_query.from_user.id
+        username = update_or_query.from_user.username or "Номаълум"
+        db.add_user(user_id, username, result_title, total_score)
         return ConversationHandler.END
 
 async def handle_answer(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    try:
-        query = update.callback_query
-        await query.answer()
+    query = update.callback_query
+    await query.answer()
 
-        parts = query.data.split('_')
-        question_index = int(parts[1])
-        answer_index = int(parts[2])
+    parts = query.data.split('_')
+    question_index = int(parts[1])
+    answer_index = int(parts[2])
 
-        current_question = context.user_data.get('current_question', 0)
+    current_question = context.user_data.get('current_question', 0)
 
-        if question_index != current_question:
-            return QUESTIONS
-
-        question = questions[question_index]
-        score = question['scores'][answer_index]
-        context.user_data['score'] = context.user_data.get('score', 0) + score
-
-        context.user_data['current_question'] = question_index + 1
-        await ask_question(query, context)
+    if question_index != current_question:
         return QUESTIONS
-    except Exception as e:
-        logger.error(f"Ошибка в handle_answer: {e}")
-        await query.message.reply_text("❌ Хато дар система. Лутфан /start-ро аз нав пахш кунед.")
-        return ConversationHandler.END
+
+    question = questions[question_index]
+    score = question['scores'][answer_index]
+    context.user_data['score'] = context.user_data.get('score', 0) + score
+
+    context.user_data['current_question'] = question_index + 1
+    await ask_question(query, context)
+    return QUESTIONS
 
 async def admin_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id not in ADMIN_IDS:
@@ -239,64 +188,20 @@ async def admin_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         await update.message.reply_text(f"Хато: {e}")
 
-# ========== MONITORING ==========
-def send_ping():
-    """Отправляет пинг в Healthchecks.io"""
-    try:
-        response = requests.get(HEALTHCHECKS_URL, timeout=10)
-        logger.info("✅ Пинг отправлен в Healthchecks.io")
-    except Exception as e:
-        logger.error(f"❌ Ошибка отправки ping: {e}")
-
-def ping_scheduler():
-    """Планировщик для отправки пингов каждые 10 минут"""
-    while True:
-        try:
-            send_ping()
-            time.sleep(600)  # 10 минут
-        except Exception as e:
-            logger.error(f"Ошибка в планировщике: {e}")
-            time.sleep(60)  # Подождать 1 минуту при ошибке
-
 # ========== WEB SERVER FOR RENDER ==========
 app = Flask(__name__)
 
 @app.route('/')
 def home():
-    return "🤖 Бот кор мекунад! Telegram: @JannatTrainingBot"
-
-@app.route('/wakeup')
-def wakeup():
-    logger.info("Бот пробужден через HTTP запрос")
-    return "Бот активен! ✅"
-
-@app.route('/ping')
-def ping():
-    send_ping()
-    return "pong", 200
+    return "🤖 Бот кор мекунад!"
 
 @app.route('/health')
 def health():
-    return {"status": "healthy", "timestamp": datetime.now().isoformat()}, 200
+    return "OK", 200
 
 def run_flask():
     port = int(os.environ.get('PORT', 5000))
-    app.run(host='0.0.0.0', port=port, debug=False)
-
-async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Обработчик ошибок"""
-    logger.error(f"Exception while handling an update: {context.error}")
-    
-    if isinstance(context.error, Conflict):
-        logger.warning("Обнаружен конфликт - другой экземпляр бота запущен. Завершаем работу...")
-        # Даем время другому экземпляру завершиться
-        await asyncio.sleep(10)
-        # Пытаемся перезапуститься
-        await context.application.stop()
-        await asyncio.sleep(5)
-        await context.application.start()
-        await context.application.updater.start_polling()
-        logger.info("Бот перезапущен после конфликта")
+    app.run(host='0.0.0.0', port=port, debug=False, use_reloader=False)
 
 def main():
     # Запускаем Flask сервер
@@ -304,17 +209,19 @@ def main():
     flask_thread.daemon = True
     flask_thread.start()
 
-    # Запускаем мониторинг
-    monitoring_thread = Thread(target=ping_scheduler)
-    monitoring_thread.daemon = True
-    monitoring_thread.start()
+    # Сначала сбрасываем вебхук
+    try:
+        response = requests.post(f"https://api.telegram.org/bot{BOT_TOKEN}/deleteWebhook")
+        logger.info(f"Вебхук сброшен: {response.status_code}")
+    except Exception as e:
+        logger.error(f"Ошибка сброса вебхука: {e}")
 
-    # Запускаем бота с обработкой ошибок
+    # Ждем немного перед запуском polling
+    time.sleep(5)
+
+    # Запускаем бота
     try:
         application = Application.builder().token(BOT_TOKEN).build()
-
-        # Добавляем обработчик ошибок
-        application.add_error_handler(error_handler)
 
         conv_handler = ConversationHandler(
             entry_points=[CommandHandler("start", start)],
@@ -322,29 +229,20 @@ def main():
                 QUESTIONS: [CallbackQueryHandler(handle_answer, pattern='^ans_')],
             },
             fallbacks=[],
-            per_message=False  # Явно указываем этот параметр
+            per_message=True  # Изменим на True
         )
 
         application.add_handler(conv_handler)
         application.add_handler(CommandHandler("stats", admin_stats))
 
         logger.info("🤖 Бот оғоз ёфт...")
+        application.run_polling()
         
-        # Запускаем бота с обработкой конфликтов
-        application.run_polling(
-            close_loop=False,
-            stop_signals=None
-        )
-        
-    except Conflict as e:
-        logger.warning(f"Конфликт при запуске: {e}. Ждем 30 секунд и перезапускаем...")
-        time.sleep(30)
-        main()  # Рекурсивный перезапуск
     except Exception as e:
-        logger.error(f"Критическая ошибка бота: {e}")
-        # Перезапуск через 60 секунд
-        time.sleep(60)
-        main()  # Рекурсивный перезапуск
+        logger.error(f"Критическая ошибка: {e}")
+        # В случае ошибки просто выходим - Render перезапустит сервис
+        time.sleep(10)
+        exit(1)
 
 if __name__ == '__main__':
     main()
