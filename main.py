@@ -106,83 +106,41 @@ QUESTIONS = 0
         'матн': '5. <b>Оё касе зиндагии туро идора мекунад?</b>\n\n💭 <i>Мисол: Ман худам зиндагимро метарошам ё фикрҳои кӯҳна маро идора мекунанд?</i>',
         'ихтиёрҳо': ['А) Ҳа, пай бурдаам', 'Б) Шояд, меҷӯям', 'В) Не, ҳамаашро ман медонам', 'Г) Намефаҳмам'],
         'баллҳо': [3, 2, 1, 0]
-    },
-    {
-        'матн': '6. <b>Ту ҳис мекунӣ, ки зиндагиат аз они туст?</b>\n\n💭 <i>Мисол: Ин зиндагиро худам сохтаам ё маҷбурона зиндагӣ мекунам?</i>',
-        'ихтиёрҳо': ['А) Ҳа, ман соҳиби зиндагиям', 'Б) Баъзан чунин ҳис мекунам', 'В) Не, фикр мекунам барои дигарон зиндагӣ мекунам', 'Г) Ман намедонам'],
-        'баллҳо': [3, 1, 0, 2]
-    },
-    {
-        'матн': '7. <b>Овози дили ту чӣ мегӯяд?</b>\n\n💭 <i>Мисол: Даруни ту чӣ мегӯяд — рав, бозист, тарс?</i>',
-        'ихтиёрҳо': ['А) Метавонӣ!', 'Б) Эҳтимол набарояд…', 'В) То ҳол сабр кун', 'Г) Хомӯш аст'],
-        'баллҳо': [3, 1, 2, 0]
-    },
-    {
-        'матн': '8. <b>Зершуур чӣ кор карда метавонад?</b>\n\n💭 <i>Мисол: Ба ман кӯмак мекунад ё не?</i>',
-        'ихтиёрҳо': ['А) Маро озод мекунад', 'Б) Ёрӣ медиҳад, ки бахшам', 'В) Ман намефаҳмам', 'Г) Ман ба ин чизҳо бовар надорам'],
-        'баллҳо': [3, 2, 1, 0]
-    },
-    {
-        'матн': '9. <b>Агар як варақи хол дошта бошӣ, чӣ менависӣ?</b>\n\n💭 <i>Мисол: Шояд "Ман мехоҳам хона созам", ё "Намедонам чӣ бихоҳам"</i>',
-        'ихтиёрҳо': ['А) Орзую муҳаббат', 'Б) Намедонам', 'В) "Ҳарчи шавад шавад"'],
-        'баллҳо': [3, 1, 0]
-    },
-    {
-        'матн': '10. <b>Омодаӣ зиндагиро худад нависӣ?</b>\n\n💭 <i>Мисол: Ба ҷои шикоят, зиндагиро дигар кардан мехоҳӣ?</i>',
-        'ихтиёрҳо': ['А) Ҳа, албатта', 'Б) Мехоҳам, вале метарсам', 'В) Ҳоло намефаҳмам', 'Г) Не, ҳамин ҳаётро қабул кардам'],
-        'баллҳо': [3, 2, 1, 0]
     }
 ]
 
 def гирифтани_натиҷа(балли_кулл):
-    if балли_кулл >= 25:
+    if балли_кулл >= 12:
         return "Ман тақдири худамам", """🎯 <b>Ту бедор шудаӣ!</b>
 
 Ту дигар намегӯӣ:
 • "Ҳечкас наметавонад бароям ҳаёт созад — ман худам!"
 • "Хато кардам — дарс гирифтам, на шикоят"
 • "Ман дигар маъюс нестам — ман офарандаам"
-• "Қарорҳоро худам мегирам, ман барои зиндагим ҷавобгар ҳастам"
 
-✨ <b>Агар туро чунин фикрҳо ҳамроҳӣ мекунанд, ту аллакай роҳро шурӯъ кардӣ!</b>
-
-Тренинги "Тақдири худро бинавис" барои ту суръатдиҳанда мешавад."""
-    elif балли_кулл >= 15:
+✨ <b>Агар туро чунин фикрҳо ҳамроҳӣ мекунанд, ту аллакай роҳро шурӯъ кардӣ!</b>"""
+    elif балли_кулл >= 7:
         return "Ман бедор шуда истодаам", """🌱 <b>Ту ба худад савол медиҳӣ, вале ҷавобҳояшон норавшанд</b>
 
 • "Ман орзу доштам… ле фаромӯш кардам"
 • "Ман фикр мекунам дигарон дар зиндагим зиёд таъсир доранд"
 • "Ман ҳис мекунам зиндагӣ худам нест…"
-• "Шояд ман ҳам метавонам, вале метарсам…"
-• "Ҳозир намедонам чӣ мехоҳам…"
 
-<b>Ин сатҳ — замини омода аст, вале ту ҳоло об надодаӣ</b>
-
-🚀 <b>Тренинг метавонад ин об шавад</b>"""
+<b>Ин сатҳ — замини омода аст, вале ту ҳоло об надодаӣ</b>"""
     else:
         return "Ман хомӯш шудам", """💤 <b>Ту шояд фикр мекунӣ, ки зиндагӣ ҳамин аст</b>
 
 • "Ҳарчи шуд, шуд. Ба ман чӣ? Ҳамааш тақдир"
 • "Ман ҳеҷ корро дуруст намекунм, беҳтараш хомӯш"
-• "Орзӯ? Ҳозир вақти орзӯ нест"
-• "Худамро намешунавам, зиндагим на фаҳм дорад, на роҳ"
 
 😔 <b>Агар чунин фикрҳо дар ту бошанд — ин маънои бад надорад</b>
-<b>Ин маъно дорад: вақти бедорӣ расидааст!</b>
+<b>Ин маъно дорад: вақти бедорӣ расидааст!</b>"""
 
-🔑 <b>Тренинг метавонад он калид бошад, ки ба ҷони ту "БАС!" мегӯяд ва дарро мекушояд</b>"""
-
-async def send_typing_animation(update, context):
-    """Анимация набора текста"""
-    await context.bot.send_chat_action(chat_id=update.effective_chat.id, action="typing")
-    time.sleep(1)
-
-async def start(update: Update, context):
-    user_id = update.effective_user.id
+def start(update, context):
+    user_id = update.message.from_user.id
     
     if db.user_exists(user_id):
-        await send_typing_animation(update, context)
-        await update.message.reply_text(
+        update.message.reply_text(
             "✨ <b>Шумо аллакай ин тестро гузаронидаед!</b> ✅\n\n"
             f"📅 <b>Тренинг:</b> 8 ноябр 2024\n"
             f"🕐 <b>Соат:</b> 14:00\n"
@@ -192,39 +150,32 @@ async def start(update: Update, context):
         )
         return ConversationHandler.END
 
-    # Анимация начала
-    await send_typing_animation(update, context)
-    await update.message.reply_text("🧠 <b>ТЕСТИ ПСИХОЛОГӢ ОҚАЗАТ ШУД...</b>", parse_mode='HTML')
-    time.sleep(1)
-    
-    await send_typing_animation(update, context)
-    await update.message.reply_text("📊 <b>САНҶИШИ ЗЕРШУУР...</b>", parse_mode='HTML')
-    time.sleep(1)
-
     context.user_data.clear()
     context.user_data['current_question'] = 0
     context.user_data['score'] = 0
 
-    await send_typing_animation(update, context)
-    await update.message.reply_text(
+    # Анимация начала
+    update.message.reply_text("🧠 <b>ТЕСТИ ПСИХОЛОГӢ ОҚАЗАТ ШУД...</b>", parse_mode='HTML')
+    time.sleep(1)
+    
+    update.message.reply_text(
         "🎭 <b>ТЕСТ: ОЁ ТУ ЗИНДАГИИ ХУДРО ХУДАД МЕНАВИСӢ Ё НЕ?</b>\n\n"
         "📌 <b>Тарзи кор:</b>\n"
         "• Барои ҳар ҷавоб балл мегиред\n"
-        "• Дар охир ҷамъ карда мешавад\n"
-        "• Натиҷаҳоро хон, мефаҳмӣ дар куҷо ҳастӣ\n\n"
-        "⏱ <b>Вақт:</b> 3-4 дақиқа\n\n"
+        "• Дар охир ҷамъ карда мешавад\n\n"
+        "⏱ <b>Вақт:</b> 2-3 дақиқа\n\n"
         "<i>Барои оғоз тугмаро пахш кунед...</i>",
         parse_mode='HTML'
     )
 
-    await ask_question(update, context)
+    ask_question(update, context)
     return QUESTIONS
 
-async def ask_question(update_or_query, context):
-    if isinstance(update_or_query, Update):
+def ask_question(update_or_query, context):
+    if hasattr(update_or_query, 'message'):
         message_method = update_or_query.message.reply_text
     else:
-        message_method = update_or_query.message.reply_text
+        message_method = update_or_query.edit_message_text
 
     current_question = context.user_data.get('current_question', 0)
 
@@ -253,17 +204,15 @@ async def ask_question(update_or_query, context):
                 row = []
 
         reply_markup = InlineKeyboardMarkup(тугмаҳо)
-        await message_method(савол_матн, reply_markup=reply_markup, parse_mode='HTML')
+        message_method(савол_матн, reply_markup=reply_markup, parse_mode='HTML')
     else:
         # Показываем результат
         балли_кулл = context.user_data.get('score', 0)
         унвони_натиҷа, тавсифи_натиҷа = гирифтани_натиҷа(балли_кулл)
-
-        await send_typing_animation(update_or_query, context)
         
         паёми_натиҷа = (
             f"🎯 <b>НАТИҶАИ ТЕСТ</b>\n\n"
-            f"🏆 <b>Балли шумо:</b> {балли_кулл}/30\n"
+            f"🏆 <b>Балли шумо:</b> {балли_кулл}/15\n"
             f"📊 <b>Статус:</b> {унвони_натиҷа}\n\n"
             f"{тавсифи_натиҷа}\n\n"
             f"✍️ <b>ХУЛОСА:</b>\n"
@@ -271,10 +220,9 @@ async def ask_question(update_or_query, context):
             f"<b>Агар мехоҳӣ нависанда бошӣ, биё ба тренинг!</b>"
         )
 
-        await message_method(паёми_натиҷа, parse_mode='HTML')
+        message_method(паёми_натиҷа, parse_mode='HTML')
         
         # Информация о тренинге
-        await send_typing_animation(update_or_query, context)
         паёми_тренинг = (
             f"🎪 <b>ТРЕНИНГИ АСОСӢ</b>\n\n"
             f"👥 <b>Ҷои маҳдуд:</b> 40 нафар\n"
@@ -285,25 +233,27 @@ async def ask_question(update_or_query, context):
             f"🌟 <b>Мо дар интизори шумоем!</b>"
         )
         
-        await message_method(паёми_тренинг, parse_mode='HTML')
+        if hasattr(update_or_query, 'message'):
+            update_or_query.message.reply_text(паёми_тренинг, parse_mode='HTML')
+        else:
+            context.bot.send_message(chat_id=update_or_query.message.chat_id, text=паёми_тренинг, parse_mode='HTML')
 
-        user_id = update_or_query.effective_user.id if isinstance(update_or_query, Update) else update_or_query.from_user.id
-        username = (update_or_query.effective_user.username if isinstance(update_or_query, Update)
-                    else update_or_query.from_user.username) or "Номаълум"
+        user_id = update_or_query.from_user.id
+        username = update_or_query.from_user.username or "Номаълум"
 
         db.add_user(user_id, username, унвони_натиҷа, балли_кулл)
         return ConversationHandler.END
 
-async def handle_answer(update: Update, context):
+def handle_answer(update, context):
     query = update.callback_query
-    await query.answer()
+    query.answer()
 
     try:
         parts = query.data.split('_')
         question_index = int(parts[1])
         answer_index = int(parts[2])
     except (ValueError, IndexError):
-        await query.message.reply_text("❌ <b>Хато. Лутфан аз нав кӯшиш кунед /start</b>", parse_mode='HTML')
+        query.message.reply_text("❌ <b>Хато. Лутфан аз нав кӯшиш кунед /start</b>", parse_mode='HTML')
         return ConversationHandler.END
 
     current_question = context.user_data.get('current_question', 0)
@@ -316,34 +266,34 @@ async def handle_answer(update: Update, context):
     context.user_data['score'] = context.user_data.get('score', 0) + балл
 
     try:
-        await query.message.delete()
+        context.bot.delete_message(chat_id=query.message.chat_id, message_id=query.message.message_id)
     except:
         pass
 
     context.user_data['current_question'] = question_index + 1
-    await ask_question(query, context)
+    ask_question(query, context)
     return QUESTIONS
 
-async def admin_export(update: Update, context):
-    if update.effective_user.id not in ADMIN_IDS:
-        await update.message.reply_text("❌ <b>Дастраси манъ аст</b>", parse_mode='HTML')
+def admin_export(update, context):
+    if update.message.from_user.id not in ADMIN_IDS:
+        update.message.reply_text("❌ <b>Дастраси манъ аст</b>", parse_mode='HTML')
         return
 
     try:
         filename = db.export_to_excel()
         with open(filename, 'rb') as file:
-            await update.message.reply_document(
+            update.message.reply_document(
                 document=file,
                 caption=f"📊 <b>Экспорти дода ({db.get_users_count()} корбар)</b>",
                 parse_mode='HTML'
             )
         os.remove(filename)
     except Exception as e:
-        await update.message.reply_text(f"❌ <b>Хато дар экспорт: {e}</b>", parse_mode='HTML')
+        update.message.reply_text(f"❌ <b>Хато дар экспорт: {e}</b>", parse_mode='HTML')
 
-async def admin_stats(update: Update, context):
-    if update.effective_user.id not in ADMIN_IDS:
-        await update.message.reply_text("❌ <b>Дастраси манъ аст</b>", parse_mode='HTML')
+def admin_stats(update, context):
+    if update.message.from_user.id not in ADMIN_IDS:
+        update.message.reply_text("❌ <b>Дастраси манъ аст</b>", parse_mode='HTML')
         return
 
     try:
@@ -359,44 +309,12 @@ async def admin_stats(update: Update, context):
         for i, user in enumerate(users, 1):
             stats_text += f"{i}. @{user[1]} - {user[2]} ({user[3]} балл)\n"
 
-        await update.message.reply_text(stats_text, parse_mode='HTML')
+        update.message.reply_text(stats_text, parse_mode='HTML')
     except Exception as e:
-        await update.message.reply_text(f"❌ <b>Хато: {e}</b>", parse_mode='HTML')
+        update.message.reply_text(f"❌ <b>Хато: {e}</b>", parse_mode='HTML')
 
-async def admin_broadcast(update: Update, context):
-    if update.effective_user.id not in ADMIN_IDS:
-        await update.message.reply_text("❌ <b>Дастраси манъ аст</b>", parse_mode='HTML')
-        return
-
-    if not context.args:
-        await update.message.reply_text("📢 <b>Истифода:</b> /broadcast <паём>", parse_mode='HTML')
-        return
-
-    message = ' '.join(context.args)
-    users = db.get_all_users()
-    success = 0
-    failed = 0
-
-    status_message = await update.message.reply_text(f"📤 <b>Оғози фиристодан...</b>\n👥 <b>Корбарон:</b> {len(users)}", parse_mode='HTML')
-
-    for user in users:
-        try:
-            await context.bot.send_message(chat_id=user[0], text=message, parse_mode='HTML')
-            success += 1
-        except Exception:
-            failed += 1
-
-    result_text = (
-        f"📢 <b>НАТИҶАИ ФИРИСТОДАН</b>\n\n"
-        f"✅ <b>Муваффақ:</b> {success}\n"
-        f"❌ <b>Номуваффақ:</b> {failed}\n"
-        f"📊 <b>Ҳамагӣ:</b> {len(users)}"
-    )
-
-    await status_message.edit_text(result_text, parse_mode='HTML')
-
-async def cancel(update: Update, context):
-    await update.message.reply_text('👋 <b>Барои оғози нав /start</b>', parse_mode='HTML')
+def cancel(update, context):
+    update.message.reply_text('👋 <b>Барои оғози нав /start</b>', parse_mode='HTML')
     return ConversationHandler.END
 
 # ========== WEB SERVER FOR RENDER ==========
@@ -408,7 +326,7 @@ def home():
 
 def run_flask():
     port = int(os.environ.get('PORT', 5000))
-    app.run(host='0.0.0.0', port=port)
+    app.run(host='0.0.0.0', port=port, debug=False)
 
 def main():
     # Запускаем Flask сервер
@@ -431,7 +349,6 @@ def main():
     dp.add_handler(conv_handler)
     dp.add_handler(CommandHandler("export", admin_export))
     dp.add_handler(CommandHandler("stats", admin_stats))
-    dp.add_handler(CommandHandler("broadcast", admin_broadcast))
 
     logger.info("🤖 Бот оғоз ёфт...")
     updater.start_polling()
