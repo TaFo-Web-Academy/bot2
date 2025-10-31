@@ -2,12 +2,12 @@ import logging
 import sqlite3
 import csv
 import os
-import time
+import asyncio
 from datetime import datetime
 from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
-from telegram.ext import Updater, CommandHandler, CallbackQueryHandler, ConversationHandler
+from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ConversationHandler, ContextTypes
 from flask import Flask
-import threading
+from threading import Thread
 
 # ========== ТАНЗИМОТ ==========
 BOT_TOKEN = "8232853921:AAGx1Mo8EwJGX46t_3h2IIQBkI7A445Femk"
@@ -136,11 +136,11 @@ def гирифтани_натиҷа(балли_кулл):
 😔 <b>Агар чунин фикрҳо дар ту бошанд — ин маънои бад надорад</b>
 <b>Ин маъно дорад: вақти бедорӣ расидааст!</b>"""
 
-def start(update, context):
-    user_id = update.message.from_user.id
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    user_id = update.effective_user.id
     
     if db.user_exists(user_id):
-        update.message.reply_text(
+        await update.message.reply_text(
             "✨ <b>Шумо аллакай ин тестро гузаронидаед!</b> ✅\n\n"
             f"📅 <b>Тренинг:</b> 8 ноябр 2024\n"
             f"🕐 <b>Соат:</b> 14:00\n"
@@ -155,12 +155,16 @@ def start(update, context):
     context.user_data['score'] = 0
 
     # Анимация начала
-    update.message.reply_text("🧠 <b>ТЕСТИ ПСИХОЛОГӢ ОҚАЗАТ ШУД...</b>", parse_mode='HTML')
-    time.sleep(1)
+    await update.message.reply_text("🧠 <b>ТЕСТИ ПСИХОЛОГӢ ОҚАЗАТ ШУД...</b>", parse_mode='HTML')
+    await asyncio.sleep(1)
     
-    update.message.reply_text(
+    await update.message.reply_text("📊 <b>САНҶИШИ ЗЕРШУУР...</b>", parse_mode='HTML')
+    await asyncio.sleep(1)
+
+    await update.message.reply_text(
         "🎭 <b>ТЕСТ: ОЁ ТУ ЗИНДАГИИ ХУДРО ХУДАД МЕНАВИСӢ Ё НЕ?</b>\n\n"
         "📌 <b>Тарзи кор:</b>\n"
+        "• 5 савол\n"
         "• Барои ҳар ҷавоб балл мегиред\n"
         "• Дар охир ҷамъ карда мешавад\n\n"
         "⏱ <b>Вақт:</b> 2-3 дақиқа\n\n"
@@ -168,14 +172,14 @@ def start(update, context):
         parse_mode='HTML'
     )
 
-    ask_question(update, context)
+    await ask_question(update, context)
     return QUESTIONS
 
-def ask_question(update_or_query, context):
-    if hasattr(update_or_query, 'message'):
+async def ask_question(update_or_query, context: ContextTypes.DEFAULT_TYPE):
+    if isinstance(update_or_query, Update):
         message_method = update_or_query.message.reply_text
     else:
-        message_method = update_or_query.edit_message_text
+        message_method = update_or_query.message.edit_text
 
     current_question = context.user_data.get('current_question', 0)
 
@@ -194,17 +198,13 @@ def ask_question(update_or_query, context):
 
         # Создаем кнопки
         тугмаҳо = []
-        row = []
         for index, ихтиёр in enumerate(савол['ихтиёрҳо']):
             label = ихтиёр.split(')')[0]  # Берем только букву (А, Б, В, Г)
             тугма = InlineKeyboardButton(f"{label}", callback_data=f"ans_{current_question}_{index}")
-            row.append(тугма)
-            if len(row) == 2 or index == len(савол['ихтиёрҳо']) - 1:
-                тугмаҳо.append(row)
-                row = []
+            тугмаҳо.append([тугма])
 
         reply_markup = InlineKeyboardMarkup(тугмаҳо)
-        message_method(савол_матн, reply_markup=reply_markup, parse_mode='HTML')
+        await message_method(савол_матн, reply_markup=reply_markup, parse_mode='HTML')
     else:
         # Показываем результат
         балли_кулл = context.user_data.get('score', 0)
@@ -220,7 +220,10 @@ def ask_question(update_or_query, context):
             f"<b>Агар мехоҳӣ нависанда бошӣ, биё ба тренинг!</b>"
         )
 
-        message_method(паёми_натиҷа, parse_mode='HTML')
+        if isinstance(update_or_query, Update):
+            await update_or_query.message.reply_text(паёми_натиҷа, parse_mode='HTML')
+        else:
+            await update_or_query.message.reply_text(паёми_натиҷа, parse_mode='HTML')
         
         # Информация о тренинге
         паёми_тренинг = (
@@ -233,10 +236,10 @@ def ask_question(update_or_query, context):
             f"🌟 <b>Мо дар интизори шумоем!</b>"
         )
         
-        if hasattr(update_or_query, 'message'):
-            update_or_query.message.reply_text(паёми_тренинг, parse_mode='HTML')
+        if isinstance(update_or_query, Update):
+            await update_or_query.message.reply_text(паёми_тренинг, parse_mode='HTML')
         else:
-            context.bot.send_message(chat_id=update_or_query.message.chat_id, text=паёми_тренинг, parse_mode='HTML')
+            await context.bot.send_message(chat_id=update_or_query.message.chat_id, text=паёми_тренинг, parse_mode='HTML')
 
         user_id = update_or_query.from_user.id
         username = update_or_query.from_user.username or "Номаълум"
@@ -244,16 +247,16 @@ def ask_question(update_or_query, context):
         db.add_user(user_id, username, унвони_натиҷа, балли_кулл)
         return ConversationHandler.END
 
-def handle_answer(update, context):
+async def handle_answer(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     query = update.callback_query
-    query.answer()
+    await query.answer()
 
     try:
         parts = query.data.split('_')
         question_index = int(parts[1])
         answer_index = int(parts[2])
     except (ValueError, IndexError):
-        query.message.reply_text("❌ <b>Хато. Лутфан аз нав кӯшиш кунед /start</b>", parse_mode='HTML')
+        await query.message.reply_text("❌ <b>Хато. Лутфан аз нав кӯшиш кунед /start</b>", parse_mode='HTML')
         return ConversationHandler.END
 
     current_question = context.user_data.get('current_question', 0)
@@ -265,35 +268,30 @@ def handle_answer(update, context):
     балл = савол['баллҳо'][answer_index]
     context.user_data['score'] = context.user_data.get('score', 0) + балл
 
-    try:
-        context.bot.delete_message(chat_id=query.message.chat_id, message_id=query.message.message_id)
-    except:
-        pass
-
     context.user_data['current_question'] = question_index + 1
-    ask_question(query, context)
+    await ask_question(query, context)
     return QUESTIONS
 
-def admin_export(update, context):
-    if update.message.from_user.id not in ADMIN_IDS:
-        update.message.reply_text("❌ <b>Дастраси манъ аст</b>", parse_mode='HTML')
+async def admin_export(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id not in ADMIN_IDS:
+        await update.message.reply_text("❌ <b>Дастраси манъ аст</b>", parse_mode='HTML')
         return
 
     try:
         filename = db.export_to_excel()
         with open(filename, 'rb') as file:
-            update.message.reply_document(
+            await update.message.reply_document(
                 document=file,
                 caption=f"📊 <b>Экспорти дода ({db.get_users_count()} корбар)</b>",
                 parse_mode='HTML'
             )
         os.remove(filename)
     except Exception as e:
-        update.message.reply_text(f"❌ <b>Хато дар экспорт: {e}</b>", parse_mode='HTML')
+        await update.message.reply_text(f"❌ <b>Хато дар экспорт: {e}</b>", parse_mode='HTML')
 
-def admin_stats(update, context):
-    if update.message.from_user.id not in ADMIN_IDS:
-        update.message.reply_text("❌ <b>Дастраси манъ аст</b>", parse_mode='HTML')
+async def admin_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id not in ADMIN_IDS:
+        await update.message.reply_text("❌ <b>Дастраси манъ аст</b>", parse_mode='HTML')
         return
 
     try:
@@ -309,12 +307,12 @@ def admin_stats(update, context):
         for i, user in enumerate(users, 1):
             stats_text += f"{i}. @{user[1]} - {user[2]} ({user[3]} балл)\n"
 
-        update.message.reply_text(stats_text, parse_mode='HTML')
+        await update.message.reply_text(stats_text, parse_mode='HTML')
     except Exception as e:
-        update.message.reply_text(f"❌ <b>Хато: {e}</b>", parse_mode='HTML')
+        await update.message.reply_text(f"❌ <b>Хато: {e}</b>", parse_mode='HTML')
 
-def cancel(update, context):
-    update.message.reply_text('👋 <b>Барои оғози нав /start</b>', parse_mode='HTML')
+async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    await update.message.reply_text('👋 <b>Барои оғози нав /start</b>', parse_mode='HTML')
     return ConversationHandler.END
 
 # ========== WEB SERVER FOR RENDER ==========
@@ -330,29 +328,27 @@ def run_flask():
 
 def main():
     # Запускаем Flask сервер
-    flask_thread = threading.Thread(target=run_flask)
+    flask_thread = Thread(target=run_flask)
     flask_thread.daemon = True
     flask_thread.start()
 
     # Запускаем бота
-    updater = Updater(BOT_TOKEN, use_context=True)
-    dp = updater.dispatcher
+    application = Application.builder().token(BOT_TOKEN).build()
 
     conv_handler = ConversationHandler(
-        entry_points=[CommandHandler('start', start)],
+        entry_points=[CommandHandler("start", start)],
         states={
             QUESTIONS: [CallbackQueryHandler(handle_answer, pattern='^ans_')],
         },
-        fallbacks=[CommandHandler('cancel', cancel)]
+        fallbacks=[CommandHandler("cancel", cancel)]
     )
 
-    dp.add_handler(conv_handler)
-    dp.add_handler(CommandHandler("export", admin_export))
-    dp.add_handler(CommandHandler("stats", admin_stats))
+    application.add_handler(conv_handler)
+    application.add_handler(CommandHandler("export", admin_export))
+    application.add_handler(CommandHandler("stats", admin_stats))
 
     logger.info("🤖 Бот оғоз ёфт...")
-    updater.start_polling()
-    updater.idle()
+    application.run_polling()
 
 if __name__ == '__main__':
     main()
