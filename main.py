@@ -84,13 +84,23 @@ questions = [
         'text': '3. <b>Орзуи кӯдакиатро ёд дори?</b>',
         'options': ['А) Ҳа, ёдам ҳаст', 'Б) Не, фаромӯш кардам', 'В) Ман дигар орзу надорам'],
         'scores': [3, 1, 0]
+    },
+    {
+        'text': '4. <b>"Зершуур" чӣ маъно дорад?</b>',
+        'options': ['А) Қувваи дохилӣ', 'Б) Барои равоншиносон', 'В) Ман намефаҳмам, ле ҷолиб аст', 'Г) Ман бовар надорам'],
+        'scores': [3, 1, 2, 0]
+    },
+    {
+        'text': '5. <b>Оё касе зиндагии туро идора мекунад?</b>',
+        'options': ['А) Ҳа, пай бурдаам', 'Б) Шояд, меҷӯям', 'В) Не, ҳамаашро ман медонам', 'Г) Намефаҳмам'],
+        'scores': [3, 2, 1, 0]
     }
 ]
 
 def get_result(total_score):
-    if total_score >= 7:
+    if total_score >= 12:
         return "Ман тақдири худамам", "Ту бедор шудаӣ! Ту аллакай роҳро шурӯъ кардӣ!"
-    elif total_score >= 4:
+    elif total_score >= 7:
         return "Ман бедор шуда истодаам", "Ту ба худад савол медиҳӣ, вале ҷавобҳояшон норавшанд"
     else:
         return "Ман хомӯш шудам", "Вақти бедорӣ расидааст!"
@@ -111,7 +121,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     context.user_data['score'] = 0
 
     await update.message.reply_text(
-        "🎭 ТЕСТ: ОЁ ТУ ЗИНДАГИИ ХУДРО ХУДАД МЕНАВИСӢ Ё НЕ?\n\n"
+        "🎭 <b>ТЕСТ: ОЁ ТУ ЗИНДАГИИ ХУДРО ХУДАД МЕНАВИСӢ Ё НЕ?</b>\n\n"
         "Барои оғоз тугмаро пахш кунед...",
         parse_mode='HTML'
     )
@@ -131,15 +141,16 @@ async def ask_question(update_or_query, context: ContextTypes.DEFAULT_TYPE):
         question = questions[current_question]
         
         question_text = (
-            f"📝 Савол {current_question + 1}/{len(questions)}\n\n"
+            f"📝 <b>Савол {current_question + 1}/{len(questions)}</b>\n\n"
             f"{question['text']}\n\n"
-            f"Интихоби худро кунед:"
+            f"<b>Интихоби худро кунед:</b>"
         )
 
+        # Создаем кнопки с полными вариантами ответов
         buttons = []
         for index, option in enumerate(question['options']):
-            label = option.split(')')[0]
-            button = InlineKeyboardButton(f"{label}", callback_data=f"ans_{current_question}_{index}")
+            # Используем полный текст варианта ответа для кнопки
+            button = InlineKeyboardButton(f"{option}", callback_data=f"ans_{current_question}_{index}")
             buttons.append([button])
 
         reply_markup = InlineKeyboardMarkup(buttons)
@@ -149,11 +160,11 @@ async def ask_question(update_or_query, context: ContextTypes.DEFAULT_TYPE):
         result_title, result_description = get_result(total_score)
         
         result_message = (
-            f"🎯 НАТИҶАИ ТЕСТ\n\n"
-            f"Балли шумо: {total_score}/9\n"
-            f"Статус: {result_title}\n\n"
+            f"🎯 <b>НАТИҶАИ ТЕСТ</b>\n\n"
+            f"<b>Балли шумо:</b> {total_score}/15\n"
+            f"<b>Статус:</b> {result_title}\n\n"
             f"{result_description}\n\n"
-            f"Барои сабти ном:\n{REGISTRATION_LINK}"
+            f"<b>Барои сабти ном:</b>\n{REGISTRATION_LINK}"
         )
 
         await message_method(result_message, parse_mode='HTML')
