@@ -3,6 +3,8 @@ import sqlite3
 import csv
 import os
 import asyncio
+import requests
+import time
 from datetime import datetime
 from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ConversationHandler, ContextTypes
@@ -13,6 +15,7 @@ from threading import Thread
 BOT_TOKEN = "8232853921:AAGx1Mo8EwJGX46t_3h2IIQBkI7A445Femk"
 ADMIN_IDS = [7249758488]
 REGISTRATION_LINK = "https://tafo-web-academy.github.io/Jannat-Registration/"
+HEALTHCHECKS_URL = "https://hc-ping.com/08edb4bf-bdd9-4286-811c-64eee76d98c7"
 
 # ========== DATABASE ==========
 class Database:
@@ -275,6 +278,25 @@ async def admin_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         await update.message.reply_text(f"Хато: {e}")
 
+# ========== MONITORING ==========
+def send_ping():
+    """Отправляет пинг в Healthchecks.io"""
+    try:
+        response = requests.get(HEALTHCHECKS_URL, timeout=10)
+        logger.info("✅ Пинг отправлен в Healthchecks.io")
+    except Exception as e:
+        logger.error(f"❌ Ошибка отправки ping: {e}")
+
+def ping_scheduler():
+    """Планировщик для отправки пингов каждые 10 минут"""
+    while True:
+        try:
+            send_ping()
+            time.sleep(600)  # 10 минут
+        except Exception as e:
+            logger.error(f"Ошибка в планировщике: {e}")
+            time.sleep(60)  # Подождать 1 минуту при ошибке
+
 # ========== WEB SERVER FOR RENDER ==========
 app = Flask(__name__)
 
@@ -289,6 +311,7 @@ def wakeup():
 
 @app.route('/ping')
 def ping():
+    send_ping()
     return "pong", 200
 
 @app.route('/health')
@@ -305,7 +328,12 @@ def main():
     flask_thread.daemon = True
     flask_thread.start()
 
-    # Запускаем бота с обработкой ошибок
+    # Запускаем мониторинг
+    monitoring_thread = Thread(target=ping_scheduler)
+    monitoring_thread.daemon = True
+    monitoring_thread.start()
+
+    # Запускаем бота
     try:
         application = Application.builder().token(BOT_TOKEN).build()
 
@@ -325,7 +353,6 @@ def main():
     except Exception as e:
         logger.error(f"Критическая ошибка бота: {e}")
         # Перезапуск через 60 секунд
-        import time
         time.sleep(60)
         main()  # Рекурсивный перезапуск
 
