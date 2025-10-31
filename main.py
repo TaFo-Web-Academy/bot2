@@ -2,6 +2,7 @@ import logging
 import sqlite3
 import requests
 import time
+import os
 from datetime import datetime
 from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ConversationHandler, ContextTypes
@@ -228,8 +229,7 @@ def main():
             states={
                 QUESTIONS: [CallbackQueryHandler(handle_answer, pattern='^ans_')],
             },
-            fallbacks=[],
-            per_message=True  # Изменим на True
+            fallbacks=[]
         )
 
         application.add_handler(conv_handler)
