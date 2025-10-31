@@ -1,8 +1,8 @@
 import logging
 import sqlite3
-import requests
-import time
+import csv
 import os
+import asyncio
 from datetime import datetime
 from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ConversationHandler, ContextTypes
@@ -52,6 +52,11 @@ class Database:
         except sqlite3.IntegrityError:
             return False
 
+    def get_all_users(self):
+        cursor = self.conn.cursor()
+        cursor.execute('SELECT user_id, username, test_result, total_score, registration_date FROM users ORDER BY registration_date DESC')
+        return cursor.fetchall()
+
     def get_users_count(self):
         cursor = self.conn.cursor()
         cursor.execute('SELECT COUNT(*) FROM users')
@@ -59,7 +64,15 @@ class Database:
 
 # ========== BOT LOGIC ==========
 db = Database()
-logging.basicConfig(level=logging.INFO)
+
+# Настройка логирования
+logging.basicConfig(
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    level=logging.INFO,
+    handlers=[
+        logging.StreamHandler()
+    ]
+)
 logger = logging.getLogger(__name__)
 
 QUESTIONS = 0
@@ -79,104 +92,177 @@ questions = [
         'text': '3. <b>Орзуи кӯдакиатро ёд дори?</b>',
         'options': ['А) Ҳа, ёдам ҳаст', 'Б) Не, фаромӯш кардам', 'В) Ман дигар орзу надорам'],
         'scores': [3, 1, 0]
+    },
+    {
+        'text': '4. <b>"Зершуур" чӣ маъно дорад?</b>',
+        'options': ['А) Қувваи дохилӣ', 'Б) Барои равоншиносон', 'В) Ман намефаҳмам, ле ҷолиб аст', 'Г) Ман бовар надорам'],
+        'scores': [3, 1, 2, 0]
+    },
+    {
+        'text': '5. <b>Оё касе зиндагии туро идора мекунад?</b>',
+        'options': ['А) Ҳа, пай бурдаам', 'Б) Шояд, меҷӯям', 'В) Не, ҳамаашро ман медонам', 'Г) Намефаҳмам'],
+        'scores': [3, 2, 1, 0]
+    },
+    {
+        'text': '6. <b>Ту ҳис мекунӣ, ки зиндагиат аз они туст?</b>',
+        'options': ['А) Ҳа, ман соҳиби зиндагиям', 'Б) Баъзан чунин ҳис мекунам', 'В) Не, фикр мекунам барои дигарон зиндагӣ мекунам', 'Г) Ман намедонам'],
+        'scores': [3, 1, 0, 2]
+    },
+    {
+        'text': '7. <b>Овози дили ту чӣ мегӯяд?</b>',
+        'options': ['А) Метавонӣ!', 'Б) Эҳтимол набарояд…', 'В) То ҳол сабр кун', 'Г) Хомӯш аст'],
+        'scores': [3, 1, 2, 0]
+    },
+    {
+        'text': '8. <b>Зершуур чӣ кор карда метавонад?</b>',
+        'options': ['А) Маро озод мекунад', 'Б) Ёрӣ медиҳад, ки бахшам', 'В) Ман намефаҳмам', 'Г) Ман ба ин чизҳо бовар надорам'],
+        'scores': [3, 2, 1, 0]
+    },
+    {
+        'text': '9. <b>Агар як варақи хол дошта бошӣ, чӣ менависӣ?</b>',
+        'options': ['А) Орзую муҳаббат', 'Б) Намедонам', 'В) "Ҳарчи шавад шавад"'],
+        'scores': [3, 1, 0]
+    },
+    {
+        'text': '10. <b>Омодаӣ зиндагиро худад нависӣ?</b>',
+        'options': ['А) Ҳа, албатта', 'Б) Мехоҳам, вале метарсам', 'В) Ҳоло намефаҳмам', 'Г) Не, ҳамин ҳаётро қабул кардам'],
+        'scores': [3, 2, 1, 0]
     }
 ]
 
 def get_result(total_score):
-    if total_score >= 7:
-        return "Ман тақдири худамам", "🎉 <b>Табрик мекунам! Ту аз он касоне, ки зиндагиашро худ месозад!</b>"
-    elif total_score >= 4:
-        return "Ман бедор шуда истодаам", "🌅 <b>Огоҳӣ! Ту дар оғози роҳе, ки ба сӯи озодӣ меравад.</b>"
+    if total_score >= 25:
+        return "Ман тақдири худамам", "🎉 <b>Табрик мекунам! Ту аз он касоне, ки зиндагиашро худ месозад!</b>\n\n✨ Ту ба назари худ омадаастӣ, ки қудрат дар дасти туст. Дигар ту ба тақдир шикоят намекунед, балки онро бо қарорҳои худ месозед.\n\n💫 <b>Тренинг барои ту як мусоидат хоҳад буд, то боз ҳам зудтар пеш равед!</b>"
+    elif total_score >= 15:
+        return "Ман бедор шуда истодаам", "🌅 <b>Огоҳӣ! Ту дар оғози роҳе, ки ба сӯи озодӣ меравад.</b>\n\nТу ҳис мекунӣ, ки чизе дар зиндагиат нодуруст аст, вале ҳанӯз роҳи дурустро наёфтаӣ. Ин аломати оғози тағйироти бузург аст!\n\n🚀 <b>Тренинг ба ту кӯмак мекунад, ки ин роҳро бо суръат ва умудвори зиёд тай кунеӣ.</b>"
     else:
-        return "Ман хомӯш шудам", "🌱 <b>Вақти бедор шудан расидааст!</b>"
+        return "Ман хомӯш шудам", "🌱 <b>Вақти бедор шудан расидааст!</b>\n\nНаметарсӣ? Ин хеле табиӣ аст. Ҳама мо аз ҷое оғоз мекунем. Аз ин сатр то он ҷое, ки мехоҳӣ, як қадам боқӣ мондааст.\n\n❤️ <b>Тренинг ба ту нишон медиҳад, ки чӣ тавр ин қадамҳоро бо эътимод ва шукуфтан бигирӣ.</b>"
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    user_id = update.effective_user.id
-    
-    if db.user_exists(user_id):
+    try:
+        user_id = update.effective_user.id
+        
+        if db.user_exists(user_id):
+            await update.message.reply_text(
+                "✨ Шумо аллакай ин тестро гузаронидаед! ✅\n\n"
+                f"Барои сабти ном:\n{REGISTRATION_LINK}",
+                parse_mode='HTML'
+            )
+            return ConversationHandler.END
+
+        context.user_data.clear()
+        context.user_data['current_question'] = 0
+        context.user_data['score'] = 0
+
         await update.message.reply_text(
-            "✨ Шумо аллакай ин тестро гузаронидаед! ✅\n\n"
-            f"Барои сабти ном:\n{REGISTRATION_LINK}",
+            "🎭 <b>ТЕСТ: ОЁ ТУ ЗИНДАГИИ ХУДРО ХУДАД МЕНАВИСӢ Ё НЕ?</b>\n\n"
+            "📊 10 савол | ⏱ 5 дақиқа\n\n"
+            "Барои оғоз тугмаро пахш кунед...",
             parse_mode='HTML'
         )
+
+        await ask_question(update, context)
+        return QUESTIONS
+    except Exception as e:
+        logger.error(f"Ошибка в команде /start: {e}")
+        await update.message.reply_text("❌ Хато дар система. Лутфан баъдтар кӯшиш кунед.")
         return ConversationHandler.END
 
-    context.user_data.clear()
-    context.user_data['current_question'] = 0
-    context.user_data['score'] = 0
-
-    await update.message.reply_text(
-        "🎭 <b>ТЕСТ: ОЁ ТУ ЗИНДАГИИ ХУДРО ХУДАД МЕНАВИСӢ Ё НЕ?</b>\n\n"
-        "Барои оғоз тугмаро пахш кунед...",
-        parse_mode='HTML'
-    )
-
-    await ask_question(update, context)
-    return QUESTIONS
-
 async def ask_question(update_or_query, context: ContextTypes.DEFAULT_TYPE):
-    if isinstance(update_or_query, Update):
-        message_method = update_or_query.message.reply_text
-    else:
-        message_method = update_or_query.message.edit_text
+    try:
+        if isinstance(update_or_query, Update):
+            message_method = update_or_query.message.reply_text
+        else:
+            message_method = update_or_query.message.edit_text
 
-    current_question = context.user_data.get('current_question', 0)
+        current_question = context.user_data.get('current_question', 0)
 
-    if current_question < len(questions):
-        question = questions[current_question]
-        
-        question_text = (
-            f"📝 <b>Савол {current_question + 1}/{len(questions)}</b>\n\n"
-            f"{question['text']}\n\n"
-            f"<b>Интихоби худро кунед:</b>"
-        )
+        if current_question < len(questions):
+            question = questions[current_question]
+            
+            # Прогресс бар
+            progress = "🟢" * (current_question + 1) + "⚪" * (len(questions) - current_question - 1)
+            
+            question_text = (
+                f"📝 <b>Савол {current_question + 1}/{len(questions)}</b>\n"
+                f"{progress}\n\n"
+                f"{question['text']}\n\n"
+                f"<b>Интихоби худро кунед:</b>"
+            )
 
-        buttons = []
-        for index, option in enumerate(question['options']):
-            button = InlineKeyboardButton(f"{option}", callback_data=f"ans_{current_question}_{index}")
-            buttons.append([button])
+            buttons = []
+            for index, option in enumerate(question['options']):
+                button = InlineKeyboardButton(f"{option}", callback_data=f"ans_{current_question}_{index}")
+                buttons.append([button])
 
-        reply_markup = InlineKeyboardMarkup(buttons)
-        await message_method(question_text, reply_markup=reply_markup, parse_mode='HTML')
-    else:
-        total_score = context.user_data.get('score', 0)
-        result_title, result_description = get_result(total_score)
-        
-        result_message = (
-            f"🎯 <b>НАТИҶАИ ТЕСТИ ШУМО</b>\n\n"
-            f"⭐ <b>Балли шумо:</b> {total_score}/9\n"
-            f"🌟 <b>Статус:</b> {result_title}\n\n"
-            f"{result_description}\n\n"
-            f"🔗 <b>Барои сабти ном:</b>\n{REGISTRATION_LINK}"
-        )
+            reply_markup = InlineKeyboardMarkup(buttons)
+            await message_method(question_text, reply_markup=reply_markup, parse_mode='HTML')
+        else:
+            total_score = context.user_data.get('score', 0)
+            result_title, result_description = get_result(total_score)
+            
+            result_message = (
+                f"🎯 <b>НАТИҶАИ ТЕСТИ ШУМО</b>\n\n"
+                f"⭐ <b>Балли шумо:</b> {total_score}/30\n"
+                f"🌟 <b>Статус:</b> {result_title}\n\n"
+                f"{result_description}\n\n"
+                f"━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                f"🎪 <b>ТАРЧИМАИ ТРЕНИНГ</b>\n\n"
+                f"📅 <b>Сана:</b> 8 ноябр 2024\n"
+                f"🕐 <b>Соат:</b> 14:00 - 17:00\n"
+                f"📍 <b>Ҷой:</b> Душанбе, Профсаюз\n"
+                f"       Доми София, 3 этаж\n"
+                f"👥 <b>Ҷойҳо маҳдуд:</b> 40 нафар\n\n"
+                f"💎 <b>Дар ин тренинг меомӯзед:</b>\n"
+                f"• Барномаҳои зершуури худро шиносед\n"
+                f"• Тақдири навро бо дасти худ нависед\n"
+                f"• Ба садои дарунии худ гӯш диҳед\n"
+                f"• Орзуҳои кӯдакиро зинда кунед\n\n"
+                f"🔗 <b>Барои сабти ном:</b>\n"
+                f"{REGISTRATION_LINK}\n\n"
+                f"✨ <b>Мо дар интизори дидори шумоем!</b>\n"
+                f"━━━━━━━━━━━━━━━━━━━━━━━━━"
+            )
 
-        await message_method(result_message, parse_mode='HTML')
+            await message_method(result_message, parse_mode='HTML')
 
-        user_id = update_or_query.from_user.id
-        username = update_or_query.from_user.username or "Номаълум"
-        db.add_user(user_id, username, result_title, total_score)
+            user_id = update_or_query.from_user.id
+            username = update_or_query.from_user.username or "Номаълум"
+            db.add_user(user_id, username, result_title, total_score)
+            return ConversationHandler.END
+    except Exception as e:
+        logger.error(f"Ошибка в ask_question: {e}")
+        if isinstance(update_or_query, Update):
+            await update_or_query.message.reply_text("❌ Хато дар система. Лутфан /start-ро аз нав пахш кунед.")
+        else:
+            await update_or_query.message.reply_text("❌ Хато дар система. Лутфан /start-ро аз нав пахш кунед.")
         return ConversationHandler.END
 
 async def handle_answer(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    query = update.callback_query
-    await query.answer()
+    try:
+        query = update.callback_query
+        await query.answer()
 
-    parts = query.data.split('_')
-    question_index = int(parts[1])
-    answer_index = int(parts[2])
+        parts = query.data.split('_')
+        question_index = int(parts[1])
+        answer_index = int(parts[2])
 
-    current_question = context.user_data.get('current_question', 0)
+        current_question = context.user_data.get('current_question', 0)
 
-    if question_index != current_question:
+        if question_index != current_question:
+            return QUESTIONS
+
+        question = questions[question_index]
+        score = question['scores'][answer_index]
+        context.user_data['score'] = context.user_data.get('score', 0) + score
+
+        context.user_data['current_question'] = question_index + 1
+        await ask_question(query, context)
         return QUESTIONS
-
-    question = questions[question_index]
-    score = question['scores'][answer_index]
-    context.user_data['score'] = context.user_data.get('score', 0) + score
-
-    context.user_data['current_question'] = question_index + 1
-    await ask_question(query, context)
-    return QUESTIONS
+    except Exception as e:
+        logger.error(f"Ошибка в handle_answer: {e}")
+        await query.message.reply_text("❌ Хато дар система. Лутфан /start-ро аз нав пахш кунед.")
+        return ConversationHandler.END
 
 async def admin_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id not in ADMIN_IDS:
@@ -194,15 +280,24 @@ app = Flask(__name__)
 
 @app.route('/')
 def home():
-    return "🤖 Бот кор мекунад!"
+    return "🤖 Бот кор мекунад! Telegram: @JannatTrainingBot"
+
+@app.route('/wakeup')
+def wakeup():
+    logger.info("Бот пробужден через HTTP запрос")
+    return "Бот активен! ✅"
+
+@app.route('/ping')
+def ping():
+    return "pong", 200
 
 @app.route('/health')
 def health():
-    return "OK", 200
+    return {"status": "healthy", "timestamp": datetime.now().isoformat()}, 200
 
 def run_flask():
     port = int(os.environ.get('PORT', 5000))
-    app.run(host='0.0.0.0', port=port, debug=False, use_reloader=False)
+    app.run(host='0.0.0.0', port=port, debug=False)
 
 def main():
     # Запускаем Flask сервер
@@ -210,17 +305,7 @@ def main():
     flask_thread.daemon = True
     flask_thread.start()
 
-    # Сначала сбрасываем вебхук
-    try:
-        response = requests.post(f"https://api.telegram.org/bot{BOT_TOKEN}/deleteWebhook")
-        logger.info(f"Вебхук сброшен: {response.status_code}")
-    except Exception as e:
-        logger.error(f"Ошибка сброса вебхука: {e}")
-
-    # Ждем немного перед запуском polling
-    time.sleep(5)
-
-    # Запускаем бота
+    # Запускаем бота с обработкой ошибок
     try:
         application = Application.builder().token(BOT_TOKEN).build()
 
@@ -237,12 +322,12 @@ def main():
 
         logger.info("🤖 Бот оғоз ёфт...")
         application.run_polling()
-        
     except Exception as e:
-        logger.error(f"Критическая ошибка: {e}")
-        # В случае ошибки просто выходим - Render перезапустит сервис
-        time.sleep(10)
-        exit(1)
+        logger.error(f"Критическая ошибка бота: {e}")
+        # Перезапуск через 60 секунд
+        import time
+        time.sleep(60)
+        main()  # Рекурсивный перезапуск
 
 if __name__ == '__main__':
     main()
