@@ -1,16 +1,12 @@
 import logging
 import sqlite3
-import csv
 import os
-import asyncio
 from datetime import datetime
 from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ConversationHandler, ContextTypes
-from flask import Flask
-from threading import Thread
 
 # ========== CONFIG ==========
-BOT_TOKEN = "8232853921:AAGx1Mo8EwJGX46t_3h2IIQBkI7A445Femk"
+BOT_TOKEN = os.environ.get('BOT_TOKEN', '8430856964:AAHjKGuExWXmpPX8fAGkHuR6wakEBitflks')
 ADMIN_IDS = [7249758488]
 REGISTRATION_LINK = "https://tafo-web-academy.github.io/Jannat-Registration/"
 
@@ -52,11 +48,6 @@ class Database:
         except sqlite3.IntegrityError:
             return False
 
-    def get_all_users(self):
-        cursor = self.conn.cursor()
-        cursor.execute('SELECT user_id, username, test_result, total_score, registration_date FROM users ORDER BY registration_date DESC')
-        return cursor.fetchall()
-
     def get_users_count(self):
         cursor = self.conn.cursor()
         cursor.execute('SELECT COUNT(*) FROM users')
@@ -65,13 +56,10 @@ class Database:
 # ========== BOT LOGIC ==========
 db = Database()
 
-# Настройка логирования
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     level=logging.INFO,
-    handlers=[
-        logging.StreamHandler()
-    ]
+    handlers=[logging.StreamHandler()]
 )
 logger = logging.getLogger(__name__)
 
@@ -79,69 +67,59 @@ QUESTIONS = 0
 
 questions = [
     {
-        'text': '1. <b>Кӣ барои зиндагии ту қарор мекунад?</b>',
-        'options': ['А) Худам', 'Б) Оила ё дигарон', 'В) Баъзан ман, баъзан онҳо', 'Г) Метарсам қарор гирам'],
+        'text': '1. <b>Кӣ қарорҳои муҳимро дар зиндагии ту мегирад?</b>\n\n<i>(Мисол: Касб, шавҳар, либос, тарзи зиндагӣ)</i>',
+        'options': ['🅐 Худам', '🅑 Оила/дигарон', '🅒 Баъзан ман, баъзан онҳо', '🅓 Метарсам қарор гирам'],
         'scores': [3, 1, 2, 0]
     },
     {
-        'text': '2. <b>Вақте чизе хато мешавад, чӣ мегӯӣ?</b>',
-        'options': ['А) Ман айбдорам', 'Б) Дигарон гунаҳкоранд', 'В) Тақдир ҳамин будааст', 'Г) Намедонам'],
+        'text': '2. <b>Агар чизе хато шавад, чӣ фикр мекунӣ?</b>',
+        'options': ['🅐 Худам айбдорам, дарс мегирам', '🅑 Дигарон гунаҳкоранд', '🅒 Тақдир ҳамин будааст', '🅓 Намефаҳмам, чаро шуд'],
         'scores': [3, 1, 0, 2]
     },
     {
-        'text': '3. <b>Орзуи кӯдакиатро ёд дори?</b>',
-        'options': ['А) Ҳа, ёдам ҳаст', 'Б) Не, фаромӯш кардам', 'В) Ман дигар орзу надорам'],
+        'text': '3. <b>Орзуи кӯдакиатро ёд дорӣ?</b>',
+        'options': ['🅐 Бале, то ҳол дар ёдам ҳаст', '🅑 Не, фаромӯш кардам', '🅒 Ман дигар орзу надорам'],
         'scores': [3, 1, 0]
     },
     {
-        'text': '4. <b>"Зершуур" чӣ маъно дорад?</b>',
-        'options': ['А) Қувваи дохилӣ', 'Б) Барои равоншиносон', 'В) Ман намефаҳмам, ле ҷолиб аст', 'Г) Ман бовар надорам'],
+        'text': '4. <b>"Зершуур"( Подсознания 🧠) барои ту чӣ маъно дорад?</b>',
+        'options': ['🅐 Қувваи пинҳонии дохили ман', '🅑 Гапи равоншиносон', '🅒 Ҷолиб аст, вале намефаҳмам', '🅓 Ба ин чизҳо бовар надорам'],
         'scores': [3, 1, 2, 0]
     },
     {
-        'text': '5. <b>Оё касе зиндагии туро идора мекунад?</b>',
-        'options': ['А) Ҳа, пай бурдаам', 'Б) Шояд, меҷӯям', 'В) Не, ҳамаашро ман медонам', 'Г) Намефаҳмам'],
-        'scores': [3, 2, 1, 0]
+        'text': '5. <b>Оё ҳис мекунӣ, ки зиндагиятро худат менависӣ?</b>',
+        'options': ['🅐 Ҳа, ҳамааш аз ман вобаста аст', '🅑 Баъзан ҳис мекунам', '🅒 Не, фикрҳои кӯҳна маро идора мекунанд', '🅓 Намефаҳмам, ки ки идора мекунад'],
+        'scores': [3, 2, 0, 1]
     },
     {
-        'text': '6. <b>Ту ҳис мекунӣ, ки зиндагиат аз они туст?</b>',
-        'options': ['А) Ҳа, ман соҳиби зиндагиям', 'Б) Баъзан чунин ҳис мекунам', 'В) Не, фикр мекунам барои дигарон зиндагӣ мекунам', 'Г) Ман намедонам'],
-        'scores': [3, 1, 0, 2]
-    },
-    {
-        'text': '7. <b>Овози дили ту чӣ мегӯяд?</b>',
-        'options': ['А) Метавонӣ!', 'Б) Эҳтимол набарояд…', 'В) То ҳол сабр кун', 'Г) Хомӯш аст'],
-        'scores': [3, 1, 2, 0]
-    },
-    {
-        'text': '8. <b>Зершуур чӣ кор карда метавонад?</b>',
-        'options': ['А) Маро озод мекунад', 'Б) Ёрӣ медиҳад, ки бахшам', 'В) Ман намефаҳмам', 'Г) Ман ба ин чизҳо бовар надорам'],
-        'scores': [3, 2, 1, 0]
-    },
-    {
-        'text': '9. <b>Агар як варақи хол дошта бошӣ, чӣ менависӣ?</b>',
-        'options': ['А) Орзую муҳаббат', 'Б) Намедонам', 'В) "Ҳарчи шавад шавад"'],
+        'text': '6. <b>Агар як варақи хол дошта бошӣ, чӣ менависӣ?</b>\n\n<i>(Мисол: "Мехоҳам хона дошта бошам", "Озодӣ мехоҳам", ё "Намедонам")</i>',
+        'options': ['Орзу ё муҳаббат', 'Намедонам', '"Ҳарчи шавад, шавад"'],
         'scores': [3, 1, 0]
     },
     {
-        'text': '10. <b>Омодаӣ зиндагиро худад нависӣ?</b>',
-        'options': ['А) Ҳа, албатта', 'Б) Мехоҳам, вале метарсам', 'В) Ҳоло намефаҳмам', 'Г) Не, ҳамин ҳаётро қабул кардам'],
+        'text': '7. <b>Дар дили ту чӣ овоз аст?</b>',
+        'options': ['🅐 Метавонӣ! Шурӯъ кун!', '🅑 Эҳтимол набарояд…', '🅒 Сабр кун, ҳоло не', '🅓 Хомӯш аст'],
+        'scores': [3, 1, 2, 0]
+    },
+    {
+        'text': '8. <b>Омодаӣ зиндагиро дигар кунӣ?</b>',
+        'options': ['🅐 Бале, ман тайёрам', '🅑 Мехоҳам, вале метарсам', '🅒 Ман намедонам, шояд', '🅓 Не, ҳамин ҳаётро қабул кардам'],
         'scores': [3, 2, 1, 0]
     }
 ]
 
 def get_result(total_score):
-    if total_score >= 25:
-        return "Ман тақдири худамам", "🎉 <b>Табрик мекунам! Ту аз он касоне, ки зиндагиашро худ месозад!</b>\n\n✨ Ту ба назари худ омадаастӣ, ки қудрат дар дасти туст. Дигар ту ба тақдир шикоят намекунед, балки онро бо қарорҳои худ месозед.\n\n💫 <b>Тренинг барои ту як мусоидат хоҳад буд, то боз ҳам зудтар пеш равед!</b>"
-    elif total_score >= 15:
-        return "Ман бедор шуда истодаам", "🌅 <b>Огоҳӣ! Ту дар оғози роҳе, ки ба сӯи озодӣ меравад.</b>\n\nТу ҳис мекунӣ, ки чизе дар зиндагиат нодуруст аст, вале ҳанӯз роҳи дурустро наёфтаӣ. Ин аломати оғози тағйироти бузург аст!\n\n🚀 <b>Тренинг ба ту кӯмак мекунад, ки ин роҳро бо суръат ва умудвори зиёд тай кунеӣ.</b>"
+    if total_score >= 21:
+        return "Ту нависандаи тақдир ҳастӣ", "🔵 <b>Ту нависандаи тақдир ҳастӣ</b>\n\n• Ту бедор шудаӣ. Хатоҳоятро дарс мебинӣ. Барои зиндагӣ ҷавобгар ҳастӣ.\n• Блоки асосӣ: Шояд суръати баландтар мехоҳӣ, вале роҳат дуруст аст.\n• Қадами аввал: Ба тренинг биё, то эҷоди навбатиро бо зершуур суръат диҳӣ."
+    elif total_score >= 13:
+        return "Ту дар миёна ҳастӣ", "🟡 <b>Ту дар миёна ҳастӣ</b>\n\n• Ҳис мекунӣ, ки дигар хел мешавад, вале намедонӣ аз куҷо оғоз кунӣ.\n• Блоки асосӣ: Тарс, шубҳа, хотираҳои кӯҳна туро нигоҳ медоранд.\n• Қадами аввал: Ба зершуур нигоҳ кун. Ин тренинг барои ҳамин сохта шудааст."
     else:
-        return "Ман хомӯш шудам", "🌱 <b>Вақти бедор шудан расидааст!</b>\n\nНаметарсӣ? Ин хеле табиӣ аст. Ҳама мо аз ҷое оғоз мекунем. Аз ин сатр то он ҷое, ки мехоҳӣ, як қадам боқӣ мондааст.\n\n❤️ <b>Тренинг ба ту нишон медиҳад, ки чӣ тавр ин қадамҳоро бо эътимод ва шукуфтан бигирӣ.</b>"
+        return "Ту хомӯш шудаӣ, вале…", "🔴 <b>Ту хомӯш шудаӣ, вале…</b>\n\n• Бовар надорӣ, ки чизе тағйир ёбад. Ҳис мекунӣ, зиндагӣ маҷбурист.\n• Блоки асосӣ: Таслимшавӣ, эҳсоси нолозим будан, тарси шикаст.\n• Қадами аввал: Дари бедориро кушо — бо ин тренинг. Ӯ аввалин чароғ мешавад."
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     try:
         user_id = update.effective_user.id
-        
+
         if db.user_exists(user_id):
             await update.message.reply_text(
                 "✨ Шумо аллакай ин тестро гузаронидаед! ✅\n\n"
@@ -155,9 +133,11 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         context.user_data['score'] = 0
 
         await update.message.reply_text(
-            "🎭 <b>ТЕСТ: ОЁ ТУ ЗИНДАГИИ ХУДРО ХУДАД МЕНАВИСӢ Ё НЕ?</b>\n\n"
-            "📊 10 савол | ⏱ 5 дақиқа\n\n"
-            "Барои оғоз тугмаро пахш кунед...",
+            '🧠 <b>ТЕСТ: "Оё ту зиндагии худро худам менависам?"</b>\n\n'
+            '📌 Ҳадаф: Фаҳмидани он ки ту воқеан "нависандаи тақдири худ" ҳастӣ ё зери таъсири зершуур, гузашта, фикрҳои дигарон зиндагӣ мекунӣ.\n\n'
+            '📊 8 савол | ⏱ 5 дақиқа\n\n'
+            '👉 Барои ҳар ҷавоб хол гир. Дар охир ҷамъ кун. Баъд натиҷаро хон.\n\n'
+            'Барои оғоз тугмаро пахш кунед...',
             parse_mode='HTML'
         )
 
@@ -179,10 +159,8 @@ async def ask_question(update_or_query, context: ContextTypes.DEFAULT_TYPE):
 
         if current_question < len(questions):
             question = questions[current_question]
-            
-            # Прогресс бар
             progress = "🟢" * (current_question + 1) + "⚪" * (len(questions) - current_question - 1)
-            
+
             question_text = (
                 f"📝 <b>Савол {current_question + 1}/{len(questions)}</b>\n"
                 f"{progress}\n\n"
@@ -200,28 +178,26 @@ async def ask_question(update_or_query, context: ContextTypes.DEFAULT_TYPE):
         else:
             total_score = context.user_data.get('score', 0)
             result_title, result_description = get_result(total_score)
-            
+
             result_message = (
-                f"🎯 <b>НАТИҶАИ ТЕСТИ ШУМО</b>\n\n"
-                f"⭐ <b>Балли шумо:</b> {total_score}/30\n"
+                "🎯 <b>НАТИҶАИ ТЕСТИ ШУМО</b>\n\n"
+                f"⭐ <b>Балли шумо:</b> {total_score}/24\n"
                 f"🌟 <b>Статус:</b> {result_title}\n\n"
                 f"{result_description}\n\n"
-                f"━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-                f"🎪 <b>ТАРЧИМАИ ТРЕНИНГ</b>\n\n"
-                f"📅 <b>Сана:</b> 8 ноябр 2024\n"
-                f"🕐 <b>Соат:</b> 14:00 - 17:00\n"
-                f"📍 <b>Ҷой:</b> Душанбе, Профсаюз\n"
-                f"       Доми София, 3 этаж\n"
-                f"👥 <b>Ҷойҳо маҳдуд:</b> 40 нафар\n\n"
-                f"💎 <b>Дар ин тренинг меомӯзед:</b>\n"
-                f"• Барномаҳои зершуури худро шиносед\n"
-                f"• Тақдири навро бо дасти худ нависед\n"
-                f"• Ба садои дарунии худ гӯш диҳед\n"
-                f"• Орзуҳои кӯдакиро зинда кунед\n\n"
-                f"🔗 <b>Барои сабти ном:</b>\n"
+                "━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                "✍️ <b>ХУЛОСА:</b>\n\n"
+                "Ин тест \"диагностика\" аст. Агар холат баланд аст — аъло! Агар паст аст — вақти бедорӣ расидааст.\n\n"
+                "━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                "🎪 <b>ТРЕНИНГ</b>\n\n"
+                "📅 <b>Сана:</b> 8 ноябр 2024\n"
+                "🕐 <b>Соат:</b> 14:00 - 17:00\n"
+                "📍 <b>Ҷой:</b> Душанбе, Профсаюз\n"
+                "       Доми София, 3 стаж\n"
+                "👥 <b>Ҷойҳо маҳдуд:</b> 40 нафар\n\n"
+                "🔗 <b>Барои сабти ном:</b>\n"
                 f"{REGISTRATION_LINK}\n\n"
-                f"✨ <b>Мо дар интизори дидори шумоем!</b>\n"
-                f"━━━━━━━━━━━━━━━━━━━━━━━━━"
+                "✨ <b>Мо дар интизори дидори шумоем!</b>\n"
+                "━━━━━━━━━━━━━━━━━━━━━━━━"
             )
 
             await message_method(result_message, parse_mode='HTML')
@@ -232,10 +208,6 @@ async def ask_question(update_or_query, context: ContextTypes.DEFAULT_TYPE):
             return ConversationHandler.END
     except Exception as e:
         logger.error(f"Ошибка в ask_question: {e}")
-        if isinstance(update_or_query, Update):
-            await update_or_query.message.reply_text("❌ Хато дар система. Лутфан /start-ро аз нав пахш кунед.")
-        else:
-            await update_or_query.message.reply_text("❌ Хато дар система. Лутфан /start-ро аз нав пахш кунед.")
         return ConversationHandler.END
 
 async def handle_answer(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -261,51 +233,20 @@ async def handle_answer(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
         return QUESTIONS
     except Exception as e:
         logger.error(f"Ошибка в handle_answer: {e}")
-        await query.message.reply_text("❌ Хато дар система. Лутфан /start-ро аз нав пахш кунед.")
         return ConversationHandler.END
 
 async def admin_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id not in ADMIN_IDS:
-        await update.message.reply_text("Дастраси манъ аст")
+        await update.message.reply_text("Дастрасӣ манъ аст")
         return
 
     try:
         count = db.get_users_count()
-        await update.message.reply_text(f"Ҳамаги корбарон: {count}")
+        await update.message.reply_text(f"Ҳамагӣ корбарон: {count}")
     except Exception as e:
         await update.message.reply_text(f"Хато: {e}")
 
-# ========== WEB SERVER FOR RENDER ==========
-app = Flask(__name__)
-
-@app.route('/')
-def home():
-    return "🤖 Бот кор мекунад! Telegram: @JannatTrainingBot"
-
-@app.route('/wakeup')
-def wakeup():
-    logger.info("Бот пробужден через HTTP запрос")
-    return "Бот активен! ✅"
-
-@app.route('/ping')
-def ping():
-    return "pong", 200
-
-@app.route('/health')
-def health():
-    return {"status": "healthy", "timestamp": datetime.now().isoformat()}, 200
-
-def run_flask():
-    port = int(os.environ.get('PORT', 5000))
-    app.run(host='0.0.0.0', port=port, debug=False)
-
 def main():
-    # Запускаем Flask сервер
-    flask_thread = Thread(target=run_flask)
-    flask_thread.daemon = True
-    flask_thread.start()
-
-    # Запускаем бота с обработкой ошибок
     try:
         application = Application.builder().token(BOT_TOKEN).build()
 
@@ -321,13 +262,9 @@ def main():
         application.add_handler(CommandHandler("stats", admin_stats))
 
         logger.info("🤖 Бот оғоз ёфт...")
-        application.run_polling()
+        application.run_polling(allowed_updates=Update.ALL_TYPES)
     except Exception as e:
         logger.error(f"Критическая ошибка бота: {e}")
-        # Перезапуск через 60 секунд
-        import time
-        time.sleep(60)
-        main()  # Рекурсивный перезапуск
 
 if __name__ == '__main__':
     main()
